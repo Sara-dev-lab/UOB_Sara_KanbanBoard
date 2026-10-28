@@ -385,7 +385,7 @@ function renderCard(task) {
        </div>`
     : `<button type="button" class="icon-btn" data-action="delete" data-id="${escapeHtml(task.id)}" aria-label="Delete task ${escapeHtml(task.id)}">&times;</button>`;
   return `
-    <article class="card prio-${slug(task.priority)}" draggable="true" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.id)}: ${escapeHtml(task.title)}">
+    <article class="card" draggable="true" data-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.id)}: ${escapeHtml(task.title)}">
       <div class="card-top">
         <span class="card-id">${escapeHtml(task.id)}</span>
         <span class="pill pill-${slug(task.priority)}">${escapeHtml(task.priority)}</span>
