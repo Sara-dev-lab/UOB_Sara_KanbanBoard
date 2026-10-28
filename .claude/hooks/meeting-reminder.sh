@@ -1,31 +1,28 @@
 #!/usr/bin/env bash
-# Meeting reminder hook.
-#   SessionStart     -> records when the session began.
-#   UserPromptSubmit -> once the session is more than 10s old, shows the
-#                       reminder to the user (a single time per session).
-set -euo pipefail
+# Meeting reminder hook (SessionStart).
+# Spawns a detached background process that waits 10 seconds and then shows a
+# desktop dialog. Uses osascript (macOS), zenity/kdialog (Linux) or PowerShell
+# (Windows / WSL / Git Bash), whichever is available.
 
 DELAY_SECS=10
-MESSAGE="Reminder: IT project management meeting next Wednesday at 10:00 AM in Room 123."
+TITLE="IT Project Management Meeting"
+MESSAGE="IT project management meeting next Wednesday at 10:00 AM in Room 123."
 
-input=$(cat)
-event=$(jq -r '.hook_event_name' <<<"$input")
-session=$(jq -r '.session_id' <<<"$input")
-state_dir="${TMPDIR:-/tmp}/meeting-reminder"
-start_file="$state_dir/$session.start"
-shown_file="$state_dir/$session.shown"
-mkdir -p "$state_dir"
+popup() {
+  if command -v osascript >/dev/null 2>&1; then
+    osascript -e "display dialog \"$MESSAGE\" with title \"$TITLE\" buttons {\"OK\"} default button \"OK\" with icon note"
+  elif command -v zenity >/dev/null 2>&1; then
+    zenity --info --title="$TITLE" --text="$MESSAGE"
+  elif command -v kdialog >/dev/null 2>&1; then
+    kdialog --title "$TITLE" --msgbox "$MESSAGE"
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    powershell.exe -NoProfile -Command "Add-Type -AssemblyName PresentationFramework; [System.Windows.MessageBox]::Show('$MESSAGE','$TITLE') | Out-Null"
+  elif command -v notify-send >/dev/null 2>&1; then
+    notify-send "$TITLE" "$MESSAGE"
+  fi
+}
 
-case "$event" in
-  SessionStart)
-    date +%s >"$start_file"
-    ;;
-  UserPromptSubmit)
-    [ -f "$shown_file" ] && exit 0
-    start=$(cat "$start_file" 2>/dev/null || date +%s)
-    if [ $(( $(date +%s) - start )) -gt "$DELAY_SECS" ]; then
-      touch "$shown_file"
-      jq -n --arg m "$MESSAGE" '{systemMessage: $m, hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: ("Tell the user briefly: " + $m)}}'
-    fi
-    ;;
-esac
+# Detach fully so Claude Code doesn't wait on the hook.
+( sleep "$DELAY_SECS"; popup ) </dev/null >/dev/null 2>&1 &
+disown
+exit 0
